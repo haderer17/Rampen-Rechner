@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BMX Rampen-Rechner (kreisförmig) — Grafisch</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#1fb6ff;
+    --text:#e6eef8;
+    --muted:#9fb4c9;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{background:linear-gradient(180deg,#071022 0%, #071a2b 100%);color:var(--text);display:flex;align-items:flex-start;justify-content:center;padding:18px;}
+  .app{width:100%;max-width:920px;}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  header h1{font-size:18px;margin:0}
+  .grid{display:grid;grid-template-columns:1fr;gap:10px}
+  .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+  .inputs{display:flex;gap:8px;flex-wrap:wrap}
+  label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+  input[type=number]{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:var(--text);min-width:112px}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+  button{background:var(--accent);border:none;color:#00222e;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer;}
+  button:hover{opacity:0.9;}
+  .small{font-size:13px;color:var(--muted)}
+  canvas{width:100%;height:320px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));display:block}
+  .results{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+  .resItem{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-size:14px}
+  footer{margin-top:10px;color:var(--muted);font-size:13px;text-align:center}
+  @media(min-width:760px){
+    .grid{grid-template-columns:320px 1fr}
+    canvas{height:420px}
+  }
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Grafischer BMX-Rampenkalkulator (kreisförmig)</h1>
+      <div class="small">Startet horizontal, endet mit Tangentenwinkel θ</div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <div><strong>Eingaben</strong></div>
+        <div class="inputs" style="margin-top:8px">
+          <label>Höhe h (m)
+            <input id="h" type="number" step="0.01" placeholder="z. B. 3.00" />
+          </label>
+          <label>Winkel θ (°)
+            <input id="theta" type="number" step="0.1" placeholder="z. B. 65" />
+          </label>
+          <label>Radius R (m)
+            <input id="R" type="number" step="0.01" placeholder="z. B. 5.20" />
+          </label>
+        </div>
+
+        <div class="controls">
+          <button id="calcBtn">Berechnen</button>
+          <button id="resetBtn" style="background:#2b3642;color:var(--text)">Zurücksetzen</button>
+          <div style="flex:1"></div>
+        </div>
+        <div class="hint">Gib mindestens zwei Werte an — das fehlende wird berechnet. Bei ungültigen Kombinationen zeigt die App eine Fehlermeldung.</div>
+
+        <div class="results" id="results" style="margin-top:12px">
+          <div class="resItem" id="outR">R = — m</div>
+          <div class="resItem" id="outh">h = — m</div>
+          <div class="resItem" id="outTheta">θ = — °</div>
+          <div class="resItem" id="outX">Horizontale Länge = — m</div>
+          <div class="resItem" id="outArc">Bogenlänge = — m</div>
+          <div class="resItem" id="outChord">Sehnenlänge = — m</div>
+        </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:13px">
+          Hinweis: Bei Eingabe von h und R gilt: h ≤ 2·R (sonst keine gültige Kreisbogen-Lösung).
+        </div>
+      </div>
+
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Vorschau</strong></div>
+          <div class="small">Tippe für Zoom / Fullscreen</div>
+        </div>
+        <canvas id="canvas" width="900" height="420" role="img" aria-label="Grafische Darstellung der Rampe"></canvas>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="downloadSvg" style="background:#2b7a78">Als SVG herunterladen</button>
+          <button id="addHome" style="background:#5a67d8">Auf Home-Bildschirm</button>
+          <div style="flex:1"></div>
+          <div class="small">Standardeingaben: h=3.00 m, θ=65°</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="card" style="margin-top:12px">
+      <div style="font-size:13px">Erstellt mit ❤️ für BMX Rampen-Berechnungen</div>
+    </footer>
+  </div>
+
+<script>
+const hInput = document.getElementById('h');
+const thetaInput = document.getElementById('theta');
+const RInput = document.getElementById('R');
+
+const outR = document.getElementById('outR');
+const outh = document.getElementById('outh');
+const outTheta = document.getElementById('outTheta');
+const outX = document.getElementById('outX');
+const outArc = document.getElementById('outArc');
+const outChord = document.getElementById('outChord');
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let lastR = null;
+let lastTheta = null;
+
+function drawRamp(R, theta) {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(isNaN(R) || isNaN(theta)) return;
+
+  lastR = R;
+  lastTheta = theta;
+
+  const margin = 40;
+  const scale = Math.min((canvas.width-2*margin)/(2*R), (canvas.height-2*margin)/R);
+  const cx = margin;
+  const cy = canvas.height - margin;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  for(let t=0;t<=theta;t+=0.01){
+    let x = R * Math.sin(t);
+    let y = R * (1 - Math.cos(t));
+    ctx.lineTo(cx + x*scale, cy - y*scale);
+  }
+  ctx.strokeStyle = '#1fb6ff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+function createSVG(R, theta) {
+  if(isNaN(R) || isNaN(theta)) return null;
+
+  const margin = 40;
+  const width = 900;
+  const height = 420;
+  const scale = Math.min((width-2*margin)/(2*R), (height-2*margin)/R);
+  const cx = margin;
+  const cy = height - margin;
+
+  let path = `M ${cx} ${cy} `;
+  for(let t=0; t<=theta; t+=0.01){
+    let x = cx + R * Math.sin(t) * scale;
+    let y = cy - R * (1 - Math.cos(t)) * scale;
+    path += `L ${x} ${y} `;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="100%" height="100%" fill="#0b1220"/>
+    <path d="${path}" stroke="#1fb6ff" stroke-width="3" fill="none"/>
+  </svg>`;
+  return svg;
+}
+
+document.getElementById('calcBtn').addEventListener('click', () => {
+  let h = parseFloat(hInput.value);
+  let theta = parseFloat(thetaInput.value) * Math.PI/180;
+  let R = parseFloat(RInput.value);
+
+  let countInputs = [h, theta, R].filter(v => !isNaN(v)).length;
+  if(countInputs < 2){
+    alert("Bitte mindestens zwei Werte eingeben.");
+    return;
+  }
+
+  try {
+    if(isNaN(R)) R = h / (1 - Math.cos(theta));
+    if(isNaN(h)) h = R * (1 - Math.cos(theta));
+    if(isNaN(theta)) theta = Math.acos(1 - h/R);
+
+    let x = R * Math.sin(theta);
+    let arc = R * theta;
